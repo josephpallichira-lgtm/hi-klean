@@ -3,8 +3,11 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev
 COPY src ./src
-COPY public ./public
 COPY scripts ./scripts
+# public/index.html is built from client/, not committed
+COPY client ./client
+COPY build.cjs ./
+RUN mkdir -p public && node build.cjs
 ENV NODE_ENV=production
 ENV TZ=Asia/Kolkata
 EXPOSE 3000
