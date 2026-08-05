@@ -1,0 +1,39 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_DB: hiklean
+      POSTGRES_USER: hiklean
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+      - ./backups:/backups
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hiklean"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://hiklean:${DB_PASSWORD}@db:5432/hiklean
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      ADMIN_USER: ${ADMIN_USER:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?set ADMIN_PASSWORD in .env}
+      START_BILL_NO: ${START_BILL_NO:-168}
+      START_REG_NO: ${START_REG_NO:-12681}
+      NODE_ENV: production
+      PORT: 3000
+      TRUST_PROXY: "true"      # a reverse proxy terminates TLS in front of this
+      TZ: Asia/Kolkata
+    ports:
+      - "127.0.0.1:3000:3000"   # put nginx/Caddy in front for HTTPS
+
+volumes:
+  dbdata:

@@ -1,0 +1,6 @@
+node_modules/
+.env
+public/index.html
+*.png
+*.pdf
+Hi-Klean-Billing*.html
