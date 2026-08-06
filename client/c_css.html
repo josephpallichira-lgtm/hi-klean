@@ -41,14 +41,6 @@ input,select,textarea{padding:9px 11px;border:1px solid #d7dee6;border-radius:9p
 input:focus,select:focus,textarea:focus{border-color:var(--acc);box-shadow:0 0 0 3px rgba(10,125,120,.13)}
 input[readonly]{background:#f7f9fb;color:var(--mut)}
 textarea{resize:vertical;min-height:60px}
-/* password box with a show/hide eye. The button is type=button so it can never
-   submit the login form, and it carries data-do="pw" because the CSP forbids
-   inline handlers — the toggle lives in the delegated click handler. */
-.pwrap{position:relative;display:block;width:100%}
-.pwrap input{width:100%;padding-right:42px}
-.pweye{position:absolute;top:0;bottom:0;right:3px;margin:auto 0;height:32px;width:34px;display:flex;align-items:center;justify-content:center;padding:0;border:0;background:none;border-radius:8px;color:var(--mut);cursor:pointer}
-.pweye:hover{color:var(--ink);background:#eef2f6}
-.pweye svg{width:19px;height:19px;display:block;pointer-events:none}
 .btn{padding:9px 15px;border-radius:9px;border:1px solid #d7dee6;background:#fff;cursor:pointer;font-weight:600;font-size:14px;white-space:nowrap}
 .btn:hover{background:#f6f8fa}
 .btn.p{background:var(--acc);border-color:var(--acc);color:#fff}
@@ -88,6 +80,39 @@ tbody tr:hover{background:#fbfdfd}
 .stat .n{font-size:12px;color:var(--mut);margin-top:2px}
 .stat.acc{background:linear-gradient(135deg,#0a7d78,#0d918b);border-color:#0a7d78;color:#fff}
 .stat.acc .k,.stat.acc .n{color:#c9e8e6}
+/* a tile that drills down. Must LOOK clickable before it is clicked — the whole
+   complaint was that it silently was not. */
+.stat.tap{cursor:pointer;position:relative;text-align:left;width:100%;font:inherit;color:inherit;
+  transition:transform .12s ease,box-shadow .12s ease,border-color .12s ease}
+.stat.tap:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(16,40,56,.13);border-color:var(--acc)}
+.stat.tap:active{transform:translateY(0)}
+.stat.tap:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.stat.tap .go{position:absolute;right:11px;top:11px;font-size:15px;line-height:1;opacity:.32}
+.stat.tap:hover .go{opacity:.85}
+.stat.acc.tap:hover{border-color:#fff}
+.stat.tap .n u{text-decoration:none;border-bottom:1px dotted currentColor;opacity:.85}
+/* drill-down list inside a modal */
+.drill{max-height:56vh;overflow:auto;-webkit-overflow-scrolling:touch}
+.drill table{width:100%}
+/* on a phone the amount must never be the column that scrolls off the edge —
+   drop the optional columns instead */
+@media(max-width:820px){
+  .hide-sm{display:none!important}
+  .drill td,.drill th{padding:8px 5px;font-size:12.5px}
+  /* the money column is pinned to the right edge so it can never be the part
+     that scrolls out of sight on a phone */
+  .drill tbody tr{background:#fff}
+  .drill th:last-child,.drill td:last-child{position:sticky;right:0;background:inherit;
+    box-shadow:-7px 0 7px -7px rgba(0,0,0,.22)}
+  .drill thead th:last-child{background:#f7f9fa}
+}
+.drill tbody tr{cursor:pointer}
+.drill tbody tr:hover{background:#f2f8f8}
+.mtot{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;
+  background:#f5f8f9;border:1px solid var(--line);border-radius:10px;padding:9px 12px;margin-bottom:10px}
+.mtot .big{font-size:20px;font-weight:700;color:var(--acc)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{background:#fff;border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-size:12px}
 /* teeth */
 .teeth{background:#fbfcfd;border:1px solid var(--line);border-radius:10px;padding:10px}
 .quad{display:grid;grid-template-columns:1fr 1fr;gap:4px 16px}

@@ -296,6 +296,20 @@
       stamp(inv); log('invoice_edit', { from: before, to: inv.total }); return inv;
     }
     if (raw.startsWith('/reports/doctors')) return doctorReport(Q.get('from'), Q.get('to'));
+    /* must come BEFORE the /reports catch-all or the dashboard drill-down
+       receives a report object where it expects a list of receipts */
+    if (raw.startsWith('/reports/payments')) {
+      const out = [];
+      bills().forEach(i => i.payments.forEach(p => {
+        if (!inRange(p.date, Q.get('from'), Q.get('to'))) return;
+        out.push({
+          id: p.id, date: p.date, mode: p.mode, ref: p.ref, amount: p.amount,
+          invId: i.id, no: i.no, billDate: i.date, billTotal: i.total,
+          pname: i.pname, preg: i.preg, pphone: i.pphone, enteredBy: 'demo'
+        });
+      }));
+      return out.sort((a, b) => b.date.localeCompare(a.date));
+    }
     if (raw.startsWith('/reports')) return reports(Q.get('from'), Q.get('to'));
     if (raw === '/users' && method === 'GET') return D.users;
     if (raw === '/users' && method === 'POST') { D.users.push({ id: D.users.length + 1, username: body.username, full_name: body.fullName || '', role: body.role, active: true, last_login: null }); log('user_create', { username: body.username }); return { id: D.users.length }; }

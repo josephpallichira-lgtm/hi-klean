@@ -14,16 +14,6 @@ const today = () => { const d = new Date(); return new Date(d.getTime() - d.getT
 const dmy = (iso) => { if (!iso) return ''; const p = String(iso).slice(0, 10).split('-'); return p[2] + '/' + p[1] + '/' + p[0]; };
 const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
 function toast(msg, bad) { const t = $('#toast'); t.textContent = msg; t.className = 'on' + (bad ? ' bad' : ''); clearTimeout(t._t); t._t = setTimeout(() => t.className = '', 3000); }
-/* ---------- password show/hide ----------
-   pwField() wraps a password input with an eye button. The button is
-   type="button" so it never submits the form it sits in, and it is toggled by
-   the delegated click handler (case 'pw') — the CSP forbids inline handlers. */
-const EYE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 12S5 5.5 12 5.5 22.5 12 22.5 12 19 18.5 12 18.5 1.5 12 1.5 12Z"/><circle cx="12" cy="12" r="3.2"/></svg>';
-const EYE_OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.9 5.8A9.7 9.7 0 0 1 12 5.5c7 0 10.5 6.5 10.5 6.5a17.6 17.6 0 0 1-3.6 4.4M6.2 7.6A17.4 17.4 0 0 0 1.5 12S5 18.5 12 18.5c1.9 0 3.5-.5 4.9-1.2"/><path d="M9.8 9.9a3.2 3.2 0 0 0 4.4 4.4"/><path d="M3 3l18 18"/></svg>';
-function pwField(attrs) {
-  return `<div class="pwrap"><input type="password" ${attrs}/>` +
-    `<button type="button" class="pweye" data-do="pw" aria-label="Show password" title="Show password">${EYE}</button></div>`;
-}
 function numWords(num) {
   num = Math.round(Number(num) || 0);
   if (num < 0) return 'Minus ' + numWords(-num);
@@ -151,7 +141,7 @@ function showLogin(msg) {
       <label style="font-size:12px;color:#68798a;font-weight:700">Username</label>
       <input id="lu" autocomplete="username" autocapitalize="none" style="width:100%;padding:11px;margin:4px 0 12px;border:1px solid #d7dee6;border-radius:9px;font-size:16px"/>
       <label style="font-size:12px;color:#68798a;font-weight:700">Password</label>
-      <div style="margin:4px 0 16px">${pwField('id="lp" autocomplete="current-password" style="padding:11px;border:1px solid #d7dee6;border-radius:9px;font-size:16px"')}</div>
+      <input id="lp" type="password" autocomplete="current-password" style="width:100%;padding:11px;margin:4px 0 16px;border:1px solid #d7dee6;border-radius:9px;font-size:16px"/>
       <button id="lb" style="width:100%;padding:12px;border:0;border-radius:9px;background:#0a7d78;color:#fff;font-weight:700;font-size:15px;cursor:pointer">Sign in</button>
       <div id="lerr" style="color:#c0392b;font-size:13px;margin-top:10px;text-align:center"></div>
     </form></div>`;
@@ -172,9 +162,9 @@ function showLogin(msg) {
 function changePassword(forced) {
   const m = modal(forced ? 'Set your password' : 'Change password',
     `${forced ? '<p style="margin-top:0" class="mut sm">You are signed in with the password an admin gave you. Set your own before you start billing.</p>' : ''}
-     <div class="f"><label>Current password</label>${pwField('id="cp0" autocomplete="current-password"')}</div>
-     <div class="f mt"><label>New password (min 8 characters)</label>${pwField('id="cp1" autocomplete="new-password"')}</div>
-     <div class="f mt"><label>Repeat new password</label>${pwField('id="cp2" autocomplete="new-password"')}</div>`,
+     <div class="f"><label>Current password</label><input id="cp0" type="password"/></div>
+     <div class="f mt"><label>New password (min 8 characters)</label><input id="cp1" type="password"/></div>
+     <div class="f mt"><label>Repeat new password</label><input id="cp2" type="password"/></div>`,
     `${forced ? '' : '<button class="btn" data-do="close">Cancel</button>'}<button class="btn p" id="cpok">Save</button>`);
   $('#cpok', m).onclick = async () => {
     if ($('#cp1', m).value !== $('#cp2', m).value) return toast('Passwords do not match', 1);
@@ -267,10 +257,18 @@ async function viewDash(M) {
   <div class="head"><div><h1>Dashboard</h1><div class="sub">${new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</div></div>
     <button class="btn p lg" data-do="newbill">＋ New Bill</button></div>
   ${isAdmin() ? `<div class="stats">
-    <div class="stat acc"><div class="k">Collected today</div><div class="v">${inr0(todayRep.collected)}</div><div class="n">${todayRep.billed.count} bill${todayRep.billed.count === 1 ? '' : 's'} today</div></div>
-    <div class="stat"><div class="k">Billed today</div><div class="v">${inr0(todayRep.billed.total)}</div><div class="n">incl. unpaid balance</div></div>
-    <div class="stat"><div class="k">This month</div><div class="v">${inr0(rep.collected)}</div><div class="n">collection</div></div>
-    <div class="stat"><div class="k">Outstanding dues</div><div class="v" style="color:${rep.duesTotal > 0 ? 'var(--bad)' : 'var(--good)'}">${inr0(rep.duesTotal)}</div><div class="n">${rep.dues.length} bills pending</div></div>
+    <button class="stat acc tap" data-do="drill" data-k="collected" data-from="${t}" data-to="${t}"><span class="go">›</span>
+      <div class="k">Collected today</div><div class="v">${inr0(todayRep.collected)}</div>
+      <div class="n"><u>see every receipt</u></div></button>
+    <button class="stat tap" data-do="drill" data-k="billed" data-from="${t}" data-to="${t}"><span class="go">›</span>
+      <div class="k">Billed today</div><div class="v">${inr0(todayRep.billed.total)}</div>
+      <div class="n"><u>${todayRep.billed.count} bill${todayRep.billed.count === 1 ? '' : 's'} today</u></div></button>
+    <button class="stat tap" data-do="drill" data-k="month" data-from="${mStart}" data-to="${t}"><span class="go">›</span>
+      <div class="k">This month</div><div class="v">${inr0(rep.collected)}</div>
+      <div class="n"><u>collection — full report</u></div></button>
+    <button class="stat tap" data-do="drill" data-k="dues"><span class="go">›</span>
+      <div class="k">Outstanding dues</div><div class="v" style="color:${rep.duesTotal > 0 ? 'var(--bad)' : 'var(--good)'}">${inr0(rep.duesTotal)}</div>
+      <div class="n"><u>${rep.dues.length} bill${rep.dues.length === 1 ? '' : 's'} pending</u></div></button>
   </div>` : ''}
   <div class="card mt">
     <div class="pad" style="display:flex;justify-content:space-between;align-items:center;padding-bottom:6px"><b>Recent bills</b>
@@ -283,6 +281,102 @@ async function viewDash(M) {
         <td class="right"><button class="btn sm" data-do="open" data-id="${i.id}">Open</button></td></tr>`).join('')}
       </tbody></table>` : '<div class="empty"><div class="big">🦷</div>No bills yet. Click <b>New Bill</b>.</div>'}</div>
   </div>`;
+}
+
+/* ---------- dashboard drill-downs ----------
+   Every number on the dashboard opens the rows behind it. A total you cannot
+   audit is a total you cannot trust. Collection follows the PAYMENT date and
+   billing follows the BILL date — they are deliberately different lists. */
+const daysAgo = (iso) => Math.max(0, Math.round((new Date(today()) - new Date(String(iso).slice(0, 10))) / 86400000));
+
+async function drill(kind, from, to) {
+  if (kind === 'month') {                       // the full report already is the drill-down
+    rp = { from, to }; location.hash = 'reports'; return;
+  }
+  const m = modal(kind === 'collected' ? 'Collected — receipts' : kind === 'billed' ? 'Bills raised' : 'Outstanding dues',
+    '<div class="empty">Loading…</div>', '<button class="btn" data-do="close">Close</button>', true);
+  const body = $('.mb', m);
+  try {
+    if (kind === 'collected') body.innerHTML = await drillCollected(from, to);
+    else if (kind === 'billed') body.innerHTML = await drillBilled(from, to);
+    else body.innerHTML = await drillDues();
+  } catch (e) { body.innerHTML = `<div class="empty">⚠ ${esc(e.message)}</div>`; return; }
+  // any row carrying data-inv opens that bill
+  body.querySelectorAll('tr[data-inv]').forEach(r => r.onclick = ev => {
+    if (ev.target.closest('a')) return;         // let phone / WhatsApp links through
+    closeModal(); openInv(Number(r.dataset.inv));
+  });
+  const csv = $('#dlCsv', m);
+  if (csv) csv.onclick = () => grab(`/reports/daybook.csv?from=${from}&to=${to}`);
+}
+
+async function drillCollected(from, to) {
+  const [pays, rep] = await Promise.all([
+    api(`/reports/payments?from=${from}&to=${to}`),
+    api(`/reports?from=${from}&to=${to}`)
+  ]);
+  if (!pays.length) return '<div class="empty"><div class="big">₹</div>No money collected in this period.</div>';
+  const tot = pays.reduce((a, p) => a + p.amount, 0);
+  return `<div class="mtot"><div><div class="sm mut">${dmy(from)}${from === to ? '' : ' – ' + dmy(to)} · ${pays.length} receipt${pays.length === 1 ? '' : 's'}</div>
+      <div class="big">${inr(tot)}</div></div>
+    <div class="chips">${rep.modes.map(x => `<span class="chip"><b>${esc(x.mode)}</b> ${inr0(x.total)}</span>`).join('')}</div></div>
+   <div class="drill"><table><thead><tr><th>Bill</th><th>Patient</th><th>Mode</th><th class="hide-sm">Ref</th><th class="hide-sm">Entered by</th><th class="num">Amount</th></tr></thead><tbody>
+    ${pays.map(p => `<tr data-inv="${p.invId}"><td class="b">${esc(p.no)}<div class="xs mut">${dmy(p.billDate)}</div></td>
+      <td>${esc(p.pname)}<div class="xs mut">${esc(p.preg || '')}</div></td>
+      <td>${esc(p.mode)}</td><td class="mut sm hide-sm">${esc(p.ref || '')}</td>
+      <td class="mut sm hide-sm">${esc(p.enteredBy || '')}</td>
+      <td class="num b">${inr(p.amount)}</td></tr>`).join('')}
+    <tr style="background:#fafbfc"><td colspan="3" class="b right">Total collected</td>
+      <td class="hide-sm"></td><td class="hide-sm"></td><td class="num b">${inr(tot)}</td></tr>
+   </tbody></table></div>
+   <div class="row mt"><button class="btn sm" id="dlCsv">⬇ Day book CSV</button>
+     <span class="xs mut" style="align-self:center">Tap any row to open the bill. Payment date, not bill date — money taken today against an older bill is counted here.</span></div>`;
+}
+
+async function drillBilled(from, to) {
+  const list = (await api(`/invoices?from=${from}&to=${to}`)).filter(i => i.type !== 'estimate');
+  if (!list.length) return '<div class="empty"><div class="big">☰</div>No bills raised in this period.</div>';
+  const tot = list.reduce((a, i) => a + i.total, 0), paid = list.reduce((a, i) => a + i.paid, 0);
+  return `<div class="mtot"><div><div class="sm mut">${dmy(from)}${from === to ? '' : ' – ' + dmy(to)} · ${list.length} bill${list.length === 1 ? '' : 's'}</div>
+      <div class="big">${inr(tot)}</div></div>
+    <div class="chips"><span class="chip">Collected <b>${inr0(paid)}</b></span>
+      <span class="chip" style="color:${tot - paid > 0.005 ? 'var(--bad)' : 'var(--good)'}">Balance <b>${inr0(tot - paid)}</b></span></div></div>
+   <div class="drill"><table><thead><tr><th>Bill</th><th>Patient</th><th class="hide-sm">Treatments</th><th class="num">Total</th><th class="num hide-sm">Paid</th><th class="num">Balance</th></tr></thead><tbody>
+    ${list.map(i => `<tr data-inv="${i.id}"><td class="b">${esc(i.no)}</td>
+      <td>${esc(i.pname)}<div class="xs mut">${esc(i.preg || '')}</div></td>
+      <td class="sm mut hide-sm">${esc(i.items.map(t => t.name).join(', ').slice(0, 48))}${i.items.map(t => t.name).join(', ').length > 48 ? '…' : ''}</td>
+      <td class="num">${inr(i.total)}</td><td class="num hide-sm">${inr(i.paid)}</td><td class="num">${balTag(i.bal)}</td></tr>`).join('')}
+    <tr style="background:#fafbfc"><td colspan="2" class="b right">Total billed</td><td class="hide-sm"></td>
+      <td class="num b">${inr(tot)}</td><td class="num b hide-sm">${inr(paid)}</td><td class="num b">${inr(tot - paid)}</td></tr>
+   </tbody></table></div>
+   <div class="xs mut mt">Tap any row to open the bill. Estimates are excluded — they are not revenue.</div>`;
+}
+
+async function drillDues() {
+  const rep = await api(`/reports?from=${today()}&to=${today()}`);
+  const dues = rep.dues;
+  if (!dues.length) return '<div class="empty"><div class="big">🎉</div>Nothing pending. Every bill is fully paid.</div>';
+  const wa = (d) => {
+    const ph = String(d.phone || '').replace(/\D/g, '');
+    if (ph.length < 10) return '';
+    const num = ph.length === 10 ? '91' + ph : ph;
+    const msg = encodeURIComponent(`Dear ${d.name}, a balance of ₹${Math.round(d.bal)} is pending on bill ${d.no} at Hi-Klean Dental Clinic. Kindly settle it at your convenience. Thank you.`);
+    return `<a class="btn sm" href="https://wa.me/${num}?text=${msg}" target="_blank" rel="noopener">Remind</a>`;
+  };
+  const over = dues.filter(d => daysAgo(d.date) > 30).reduce((a, d) => a + d.bal, 0);
+  return `<div class="mtot"><div><div class="sm mut">${dues.length} bill${dues.length === 1 ? '' : 's'} pending · all time</div>
+      <div class="big" style="color:var(--bad)">${inr(rep.duesTotal)}</div></div>
+    <div class="chips"><span class="chip">Over 30 days <b>${inr0(over)}</b></span>
+      <span class="chip">Largest <b>${inr0(Math.max(...dues.map(d => d.bal)))}</b></span></div></div>
+   <div class="drill"><table><thead><tr><th>Bill</th><th>Patient</th><th class="hide-sm">Phone</th><th class="num">Age</th><th class="num">Balance</th><th></th></tr></thead><tbody>
+    ${dues.map(d => `<tr data-inv="${d.id}"><td class="b">${esc(d.no)}<div class="xs mut">${dmy(d.date)}</div></td>
+      <td>${esc(d.name)}</td>
+      <td class="sm hide-sm">${d.phone ? `<a href="tel:${esc(String(d.phone).replace(/[^0-9+]/g, ''))}">${esc(d.phone)}</a>` : '<span class="mut">—</span>'}</td>
+      <td class="num sm ${daysAgo(d.date) > 30 ? 'b' : 'mut'}" style="${daysAgo(d.date) > 30 ? 'color:var(--bad)' : ''}">${daysAgo(d.date)}d</td>
+      <td class="num"><span class="tag r">${inr(d.bal)}</span></td>
+      <td class="right" style="white-space:nowrap">${wa(d)}</td></tr>`).join('')}
+   </tbody></table></div>
+   <div class="xs mut mt">Sorted by amount. Tap a row to open the bill and collect. Highest 200 shown.</div>`;
 }
 
 window.addEventListener('offline', () => { if (!$('.offline')) document.body.appendChild(el('<div class="offline">No internet — the app cannot save until the connection is back.</div>')); });
@@ -316,18 +410,7 @@ document.addEventListener('click', e => {
     case 'printt': printInv(Number(id), 1); break;
     case 'edit': closeModal(); B = null; location.hash = 'bill/' + id; break;
     case 'audit': showAudit(); break;
-    case 'pw': {
-      const inp = b.parentNode.querySelector('input'); if (!inp) break;
-      const show = inp.type === 'password';
-      inp.type = show ? 'text' : 'password';
-      b.innerHTML = show ? EYE_OFF : EYE;
-      b.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
-      b.title = show ? 'Hide password' : 'Show password';
-      // keep the caret where the user was typing
-      inp.focus();
-      const n = inp.value.length; try { inp.setSelectionRange(n, n); } catch { }
-      break;
-    }
+    case 'drill': drill(b.dataset.k, b.dataset.from, b.dataset.to); break;
   }
 });
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('/sw.js').catch(() => { });

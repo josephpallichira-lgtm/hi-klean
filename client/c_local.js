@@ -418,6 +418,21 @@
       return { __file: 'daybook_' + Q.get('from') + '_to_' + Q.get('to') + '.csv', text: rows.join('\n') };
     }
     if (raw.startsWith('/reports/doctors')) { admin(); return doctorReport(Q.get('from'), Q.get('to')); }
+    /* receipt-level list behind the "Collected" tile — must come BEFORE the
+       /reports catch-all or the dashboard drill-down gets a report object */
+    if (raw.startsWith('/reports/payments')) {
+      admin();
+      const out = [];
+      billsOnly().forEach(i => (i.payments || []).forEach(p => {
+        if (!inR(p.date, Q.get('from'), Q.get('to'))) return;
+        out.push({
+          id: p.id, date: p.date, mode: p.mode, ref: p.ref, amount: p.amount,
+          invId: i.id, no: i.no, billDate: i.date, billTotal: i.total,
+          pname: i.pname, preg: i.preg, pphone: i.pphone, enteredBy: ''
+        });
+      }));
+      return out.sort((a, b) => b.date.localeCompare(a.date) || (b.id > a.id ? 1 : -1));
+    }
     if (raw.startsWith('/reports')) { admin(); return reports(Q.get('from'), Q.get('to')); }
 
     /* users */
