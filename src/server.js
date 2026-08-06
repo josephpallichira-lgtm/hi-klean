@@ -613,6 +613,8 @@ async function doctorReport(from, to) {
     WITH pay AS (
       SELECT invoice_id, sum(amount_paise) paid FROM payments
       WHERE pay_date BETWEEN $1 AND $2 GROUP BY invoice_id
+    ), allpay AS (          -- every payment ever made on the bill, not just this window
+      SELECT invoice_id, sum(amount_paise) paid FROM payments GROUP BY invoice_id
     ), line AS (
       SELECT it.doctor_id, COALESCE(d.name,'(not assigned)') doc_name, it.name, it.qty,
              it.amount_paise,
@@ -625,12 +627,26 @@ async function doctorReport(from, to) {
                   THEN round(it.amount_paise::numeric / i.sub_paise * COALESCE(p.paid,0))
                   ELSE round(COALESCE(p.paid,0)::numeric / GREATEST(1,(SELECT count(*) FROM invoice_items x WHERE x.invoice_id=i.id)))
              END AS coll_paise,
+             -- OF that collection, the part that settles a bill raised OUTSIDE the window.
+             -- Without this, billed - collected reads as a negative "outstanding" and looks
+             -- like the doctor was paid for work never billed. It is simply older work.
+             CASE WHEN NOT (i.bill_date BETWEEN $1 AND $2) AND i.sub_paise > 0
+                  THEN round(it.amount_paise::numeric / i.sub_paise * COALESCE(p.paid,0))
+                  WHEN NOT (i.bill_date BETWEEN $1 AND $2)
+                  THEN round(COALESCE(p.paid,0)::numeric / GREATEST(1,(SELECT count(*) FROM invoice_items x WHERE x.invoice_id=i.id)))
+                  ELSE 0 END AS prior_paise,
+             -- what is STILL unpaid on the bills raised inside the window, counting every
+             -- payment ever received against them. This is the real "outstanding".
+             CASE WHEN i.bill_date BETWEEN $1 AND $2 AND i.sub_paise > 0
+                  THEN round(it.amount_paise::numeric / i.sub_paise * (i.total_paise - COALESCE(ap.paid,0)))
+                  ELSE 0 END AS unpaid_paise,
              (i.bill_date BETWEEN $1 AND $2) AS in_window,
              i.id inv_id, i.patient_id
       FROM invoice_items it
       JOIN invoices i ON i.id = it.invoice_id
       LEFT JOIN doctors d ON d.id = it.doctor_id
       LEFT JOIN pay p ON p.invoice_id = i.id
+      LEFT JOIN allpay ap ON ap.invoice_id = i.id
       WHERE i.type='bill' AND i.voided_at IS NULL
         AND ((i.bill_date BETWEEN $1 AND $2) OR p.paid IS NOT NULL)
     )
@@ -638,17 +654,23 @@ async function doctorReport(from, to) {
            sum(CASE WHEN in_window THEN qty ELSE 0 END)::float AS qty,
            count(*)::int AS lines,
            sum(net_paise)::bigint AS net,
-           sum(coll_paise)::bigint AS coll
+           sum(coll_paise)::bigint AS coll,
+           sum(prior_paise)::bigint AS prior,
+           sum(unpaid_paise)::bigint AS unpaid
     FROM line GROUP BY doctor_id, doc_name, name ORDER BY doc_name, net DESC`, P);
 
   const byDoc = new Map();
   for (const r of rows) {
     if (!Number(r.net) && !Number(r.coll)) continue;
     const k = r.doctor_id || 0;
-    if (!byDoc.has(k)) byDoc.set(k, { doctorId: r.doctor_id, name: r.doc_name, billed: 0, collected: 0, procedures: [], bills: 0, patients: 0 });
+    if (!byDoc.has(k)) byDoc.set(k, { doctorId: r.doctor_id, name: r.doc_name, billed: 0, collected: 0, prior: 0, unpaid: 0, procedures: [], bills: 0, patients: 0 });
     const dd = byDoc.get(k);
     dd.billed += Number(r.net); dd.collected += Number(r.coll);
-    dd.procedures.push({ name: r.name, qty: r.qty, lines: r.lines, billed: toRupees(r.net), collected: toRupees(r.coll) });
+    dd.prior += Number(r.prior); dd.unpaid += Number(r.unpaid);
+    dd.procedures.push({
+      name: r.name, qty: r.qty, lines: r.lines,
+      billed: toRupees(r.net), collected: toRupees(r.coll), prior: toRupees(r.prior)
+    });
   }
   const totals = (await q(`
     SELECT it.doctor_id, count(DISTINCT i.id)::int bills, count(DISTINCT i.patient_id)::int patients
@@ -662,6 +684,9 @@ async function doctorReport(from, to) {
   return [...byDoc.values()].map(d => ({
     doctorId: d.doctorId, name: d.name, bills: d.bills, patients: d.patients,
     billed: toRupees(d.billed), collected: toRupees(d.collected),
+    // collectedPrior: part of `collected` that settles bills raised before this period
+    // unpaid: what is still owed on the bills raised INSIDE this period
+    collectedPrior: toRupees(d.prior), unpaid: toRupees(d.unpaid),
     procedures: d.procedures.sort((a, b) => b.billed - a.billed)
   })).sort((a, b) => b.billed - a.billed);
 }
