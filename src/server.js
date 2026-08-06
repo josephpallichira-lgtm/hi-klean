@@ -668,6 +668,28 @@ async function doctorReport(from, to) {
 app.get('/api/reports/doctors', admin, wrap(async (req, res) =>
   ok(res, await doctorReport(req.query.from, req.query.to))));
 
+/** Receipt-level list behind the "Collected" tile. Collection follows the PAYMENT
+ *  date, not the bill date — money taken today against an old bill belongs here
+ *  and must not be shown as "billed today". */
+app.get('/api/reports/payments', admin, wrap(async (req, res) => {
+  const { rows } = await q(`
+    SELECT p.id, p.pay_date, p.mode, p.ref, p.amount_paise, p.created_at,
+           i.id inv_id, i.no, i.bill_date, i.total_paise,
+           pt.name pname, pt.reg_no, pt.phone, COALESCE(u.username,'') entered_by
+    FROM payments p
+    JOIN invoices i ON i.id = p.invoice_id
+    JOIN patients pt ON pt.id = i.patient_id
+    LEFT JOIN users u ON u.id = p.created_by
+    WHERE i.type='bill' AND i.voided_at IS NULL AND p.pay_date BETWEEN $1 AND $2
+    ORDER BY p.pay_date DESC, p.id DESC LIMIT 500`, [req.query.from, req.query.to]);
+  ok(res, rows.map(r => ({
+    id: r.id, date: r.pay_date, mode: r.mode, ref: r.ref, amount: toRupees(r.amount_paise),
+    at: r.created_at, invId: r.inv_id, no: r.no, billDate: r.bill_date,
+    billTotal: toRupees(r.total_paise), pname: r.pname, preg: r.reg_no, pphone: r.phone,
+    enteredBy: r.entered_by
+  })));
+}));
+
 app.get('/api/reports/doctors.csv', admin, wrap(async (req, res) => {
   const data = await doctorReport(req.query.from, req.query.to);
   const esc = v => `"${String(v ?? '').replace(/^[=+\-@]/, "'$&").replace(/"/g, '""')}"`;
