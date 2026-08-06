@@ -154,22 +154,27 @@
       if (!billedIn && !paidIn) return;
       i.items.forEach(it => {
         const doc = M.doctors.find(d => d.id === it.docId) || { id: 0, name: '(not assigned)' };
-        if (!out.has(doc.id)) out.set(doc.id, { doctorId: doc.id, name: doc.name, billed: 0, collected: 0, bills: new Set(), patients: new Set(), procs: {} });
+        if (!out.has(doc.id)) out.set(doc.id, { doctorId: doc.id, name: doc.name, billed: 0, collected: 0, prior: 0, unpaid: 0, bills: new Set(), patients: new Set(), procs: {} });
         const o = out.get(doc.id);
         const share = i.sub ? it.amount / i.sub : 1 / (i.items.length || 1);
         const net = billedIn ? money(share * i.total) : 0;
         const coll = money(share * paidIn);
-        o.billed += net; o.collected += coll;
+        // collection that settles a bill raised OUTSIDE the window, and what is still
+        // owed on the bills raised INSIDE it — mirrors src/server.js doctorReport()
+        const prior = billedIn ? 0 : coll;
+        const unpaid = billedIn ? money(share * (i.total - (i.payments || []).reduce((a, x) => a + x.amount, 0))) : 0;
+        o.billed += net; o.collected += coll; o.prior += prior; o.unpaid += unpaid;
         if (billedIn) { o.bills.add(i.id); o.patients.add(i.patientId); }
-        o.procs[it.name] = o.procs[it.name] || { name: it.name, qty: 0, billed: 0, collected: 0 };
+        o.procs[it.name] = o.procs[it.name] || { name: it.name, qty: 0, billed: 0, collected: 0, prior: 0 };
         if (billedIn) o.procs[it.name].qty += Number(it.qty) || 0;
-        o.procs[it.name].billed += net; o.procs[it.name].collected += coll;
+        o.procs[it.name].billed += net; o.procs[it.name].collected += coll; o.procs[it.name].prior += prior;
       });
     });
     return [...out.values()].map(o => ({
       doctorId: o.doctorId, name: o.name, bills: o.bills.size, patients: o.patients.size,
       billed: money(o.billed), collected: money(o.collected),
-      procedures: Object.values(o.procs).map(p => ({ name: p.name, qty: p.qty, billed: money(p.billed), collected: money(p.collected) }))
+      collectedPrior: money(o.prior), unpaid: money(o.unpaid),
+      procedures: Object.values(o.procs).map(p => ({ name: p.name, qty: p.qty, billed: money(p.billed), collected: money(p.collected), prior: money(p.prior) }))
         .sort((a, b) => b.billed - a.billed)
     })).sort((a, b) => b.billed - a.billed);
   }

@@ -145,6 +145,8 @@ async function viewReports(M) {
 async function loadReports() {
   const d = await api(`/reports?from=${rp.from}&to=${rp.to}`);
   const mx = Math.max(1, ...d.modes.map(m => m.total));
+  // the user may have navigated away while the request was in flight
+  if (!$('#rout')) return;
   $('#rout').innerHTML = `
    <div class="stats">
      <div class="stat acc"><div class="k">Collected</div><div class="v">${inr0(d.collected)}</div><div class="n">in selected period</div></div>
@@ -180,6 +182,13 @@ async function loadReports() {
 }
 
 /* ===================== DOCTOR REPORT ===================== */
+/* which doctor's card is open. null = show them all. */
+let docPick = null;
+function pickDoctor(id) {
+  const n = Number(id);
+  docPick = (docPick === n) ? null : n;      // tapping the open one closes it
+  loadDoctorReport();
+}
 async function viewDoctorReport(M) {
   if (!rp.from) rp = { from: today().slice(0, 8) + '01', to: today() };
   M.innerHTML = `<div class="head"><div><h1>Doctor Report</h1>
@@ -191,19 +200,36 @@ async function viewDoctorReport(M) {
 }
 async function loadDoctorReport() {
   const list = await api(`/reports/doctors?from=${rp.from}&to=${rp.to}`);
+  if (!$('#dout')) return;
   if (!list.length) { $('#dout').innerHTML = '<div class="card empty">No treatments billed in this period.</div>'; return; }
   const grand = list.reduce((a, d) => a + d.billed, 0);
+  const anyPrior = list.some(d => (d.collectedPrior || 0) > 0.004);
+  if (!$('#dout')) return;
+  // a doctor picked in an earlier date range may have nothing in this one
+  if (docPick !== null && !list.some(d => d.doctorId === docPick)) docPick = null;
+  const shown = docPick === null ? list : list.filter(d => d.doctorId === docPick);
   $('#dout').innerHTML = `<div class="stats">
-      ${list.map(d => `<div class="stat"><div class="k">${esc(d.name)}</div><div class="v">${inr0(d.billed)}</div>
-        <div class="n">${d.bills} bills · ${d.patients} patients · collected ${inr0(d.collected)}</div>
-        <div class="n">${grand ? Math.round(d.billed / grand * 100) : 0}% of period revenue</div></div>`).join('')}
+      ${list.map(d => `<button class="stat tap ${docPick === d.doctorId ? 'acc' : ''}" data-do="docpick" data-id="${d.doctorId}">
+        <span class="go">${docPick === d.doctorId ? '×' : '›'}</span>
+        <div class="k">${esc(d.name)}</div><div class="v">${inr0(d.billed)}</div>
+        <div class="n">${d.bills} bill${d.bills === 1 ? '' : 's'} · ${d.patients} patient${d.patients === 1 ? '' : 's'} · collected ${inr0(d.collected)}</div>
+        <div class="n"><u>${docPick === d.doctorId ? 'showing only this doctor' : 'see this doctor\'s procedures'}</u></div></button>`).join('')}
     </div>
-    ${list.map(d => `<div class="card mt">
+    ${docPick !== null ? `<div class="row mt"><button class="btn" data-do="docall">← All doctors</button>
+      <span class="sm mut" style="align-self:center">Showing <b>${esc(shown[0].name)}</b> only.</span></div>` : ''}
+    ${anyPrior ? `<div class="card pad mt sm" style="border-left:3px solid var(--acc)">
+      <b>Why collected can exceed billed.</b> Billing is counted on the <b>bill date</b>; collection is counted on the
+      <b>payment date</b>. A balance settled in this period against a bill raised earlier shows up as collection here with
+      no matching billing — that is older work being paid for, not unbilled treatment. The amount is stated per doctor below.</div>` : ''}
+    ${shown.map(d => `<div class="card mt doccard" data-doc="${d.doctorId}">
       <div class="pad" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
         <b>${esc(d.name)}</b>
-        <span class="sm mut">Billed <b>${inr(d.billed)}</b> · Collected <b>${inr(d.collected)}</b> · Outstanding <b style="color:var(--bad)">${inr(d.billed - d.collected)}</b></span></div>
+        <span class="sm mut">Billed <b>${inr(d.billed)}</b> · Collected <b>${inr(d.collected)}</b>${(d.collectedPrior || 0) > 0.004
+        ? ` <span class="tag y">incl. ${inr(d.collectedPrior)} against earlier bills</span>` : ''}
+          · Unpaid on this period's bills <b style="color:${d.unpaid > 0.004 ? 'var(--bad)' : 'var(--good)'}">${inr(d.unpaid || 0)}</b></span></div>
       <div class="scroll"><table><thead><tr><th>Procedure</th><th class="num">Times</th><th class="num">Billed</th><th class="num">Collected</th></tr></thead><tbody>
-        ${d.procedures.map(p => `<tr><td>${esc(p.name)}</td><td class="num">${p.qty}</td>
+        ${d.procedures.map(p => `<tr><td>${esc(p.name)}${(p.prior || 0) > 0.004 && (p.billed || 0) <= 0.004
+        ? ' <span class="tag y">earlier bill</span>' : ''}</td><td class="num">${p.qty}</td>
           <td class="num b">${inr(p.billed)}</td><td class="num">${inr(p.collected)}</td></tr>`).join('')}
         <tr style="background:#fafbfc"><td class="b right">Total</td><td></td><td class="num b">${inr(d.billed)}</td><td class="num b">${inr(d.collected)}</td></tr>
       </tbody></table></div></div>`).join('')}`;

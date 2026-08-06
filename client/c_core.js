@@ -411,6 +411,8 @@ document.addEventListener('click', e => {
     case 'edit': closeModal(); B = null; location.hash = 'bill/' + id; break;
     case 'audit': showAudit(); break;
     case 'drill': drill(b.dataset.k, b.dataset.from, b.dataset.to); break;
+    case 'docpick': pickDoctor(id); break;
+    case 'docall': docPick = null; loadDoctorReport(); break;
   }
 });
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('/sw.js').catch(() => { });

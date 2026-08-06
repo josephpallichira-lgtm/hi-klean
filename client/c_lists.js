@@ -27,6 +27,7 @@ async function loadInvList() {
   const list = await api('/invoices?' + qs.toString());
   const real = list.filter(i => i.type !== 'estimate');
   const tot = real.reduce((a, i) => a + i.total, 0), paid = real.reduce((a, i) => a + i.paid, 0);
+  if (!$('#ilist')) return;
   $('#ilist').innerHTML = list.length ? `<table><thead><tr><th>Bill</th><th>Date</th><th>Patient</th><th>Treatments</th>
      <th class="num">Total</th><th class="num">Paid</th><th class="num">Balance</th><th></th></tr></thead><tbody>
     ${list.map(i => `<tr><td class="b">${esc(i.no)}${i.type === 'estimate' ? ' <span class="tag y">EST</span>' : ''}</td>
@@ -123,6 +124,7 @@ async function viewPatients(M, args) {
 }
 async function loadPatients() {
   const list = await api('/patients' + (pq.trim().length >= 2 ? '?q=' + encodeURIComponent(pq.trim()) : ''));
+  if (!$('#plist')) return;
   $('#plist').innerHTML = list.length ? `<table><thead><tr><th>Patient ID</th><th>Name</th><th>Age/Sex</th><th>Phone</th><th></th></tr></thead><tbody>
     ${list.map(p => `<tr><td class="mut">${esc(p.reg || '')}</td><td class="b">${esc(p.name)}</td>
       <td>${esc(p.age || '')}${p.sex ? ' / ' + esc(String(p.sex)[0]) : ''}</td><td>${esc(p.phone || '')}</td>
