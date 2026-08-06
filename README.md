@@ -93,6 +93,14 @@ with `DATABASE_URL`, `KEEP_DAYS`, `BACKUP_WEBHOOK`, `BACKUP_TOKEN`.
   The treating doctor is still recorded per line for the doctor report.
 - **Nothing navigates away from the app on its own** — see `doPrint()`.
 - **No inline event handlers.** The CSP forbids them; use delegated `data-do`.
+- **Every dashboard number opens the rows behind it.** A total you cannot audit
+  is a total you cannot trust. Collection follows the *payment* date, billing
+  follows the *bill* date — the two drill-downs are deliberately different lists.
+- **Never subtract a period's collection from a period's billing.** They count
+  different sets of bills, so the difference is meaningless and goes negative the
+  moment an old balance is settled. The doctor report states `collectedPrior`
+  (collection settling earlier bills) and `unpaid` (still owed on *this* period's
+  bills) instead. `unpaid` can never be negative.
 
 ## Tests
 
