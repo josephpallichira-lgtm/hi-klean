@@ -8,7 +8,7 @@ const call=async(p,m,b,c)=>{const r=await fetch(U+p,{method:m||'GET',
   let d=null;try{d=await r.json()}catch{};return{status:r.status,data:d,sc:r.headers.get('set-cookie')}};
 
 (async()=>{
-  let r = await call('/api/auth/login','POST',{username:'admin',password:'Test@1234'});
+  let r = await call('/api/auth/login','POST',{username:'admin',password:process.env.HKPASS||'Test@12345'});
   const admin=(r.sc||'').split(';')[0];
   t('signed in', r.status===200);
   const base = (await call('/api/settings','GET',undefined,admin)).data;
