@@ -1,11 +1,16 @@
 {
   "name": "hiklean-billing",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "description": "",
   "main": "index.js",
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
+    "dev:web": "npm --prefix web run dev",
+    "build": "npm --prefix web run build && node build_pwa.cjs",
+    "build:offline": "node build_local.cjs",
+    "typecheck": "npm --prefix web run typecheck",
+    "test": "bash tests-react/all.sh",
     "import": "node scripts/import-backup.js",
     "reset-password": "node scripts/reset-password.js"
   },

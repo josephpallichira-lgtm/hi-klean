@@ -1,6 +1,6 @@
-node_modules/
+node_modules
+public
+dist
+dist-single
 .env
-public/index.html
-*.png
-*.pdf
-Hi-Klean-Billing*.html
+*.local

@@ -1,15 +1,28 @@
+# ---------- stage 1: build the browser app ----------
+# React + TypeScript, compiled by Vite. Kept in its own stage so none of the
+# front-end toolchain ends up in the image that runs the clinic.
+FROM node:22-alpine AS web
+WORKDIR /build
+COPY web/package*.json web/
+RUN cd web && npm ci
+COPY web ./web
+COPY build_pwa.cjs ./
+RUN cd web && npm run build
+# index.html + assets/ are written to /build/public by Vite; the PWA assets
+# (manifest, service worker, icons) are generated from committed sources. They
+# used to live only in an uncommitted public/, so an image built without them
+# answered /manifest.webmanifest with index.html at HTTP 200 — a silent failure
+# that passes a status check and breaks Add to Home Screen.
+RUN node build_pwa.cjs
+
+# ---------- stage 2: the server ----------
 FROM node:22-alpine
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev
 COPY src ./src
 COPY scripts ./scripts
-# public/ is built entirely by build.cjs — index.html AND the PWA assets
-# (manifest, service worker, icons). Nothing under public/ is committed, so
-# nothing here may COPY it.
-COPY client ./client
-COPY build.cjs ./
-RUN node build.cjs
+COPY --from=web /build/public ./public
 # The Railway cron service starts this file with `node backup.mjs`. It must be
 # in the image or the nightly backup crashes with MODULE_NOT_FOUND.
 COPY backup.mjs ./
